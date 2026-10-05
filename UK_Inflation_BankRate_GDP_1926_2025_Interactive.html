@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UK Inflation — 1926–2025 Interactive Simulation</title>
+<style>
+  :root {
+    --ink:#172033; --muted:#667085; --grid:#d9dee8; --panel:#f7f8fb;
+    --accent:#2457d6; --accent2:#173f9f; --negative:#b42318;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:Inter,Segoe UI,Arial,sans-serif; color:var(--ink);
+    background:linear-gradient(180deg,#eef3fb 0%,#fff 42%);
+  }
+  .wrap { max-width:1180px; margin:0 auto; padding:28px 22px 34px; }
+  h1 { margin:0 0 5px; font-size:clamp(26px,4vw,42px); letter-spacing:-.7px; }
+  .subtitle { color:var(--muted); font-size:16px; margin-bottom:22px; }
+  .card {
+    background:white; border:1px solid #e3e7ef; border-radius:18px;
+    box-shadow:0 8px 28px rgba(18,32,61,.07); padding:20px;
+  }
+  .stats { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:12px; }
+  .stat { background:var(--panel); border-radius:13px; padding:13px 15px; }
+  .label { font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  .big { font-size:25px; font-weight:750; margin-top:4px; }
+  #year { color:var(--accent); }
+  #rate.negative { color:var(--negative); }
+  .legend { display:flex; flex-wrap:wrap; gap:18px; margin:4px 0 8px 3px; font-size:13px; color:#475467; font-weight:650; } .legend span { display:inline-flex; align-items:center; gap:7px; } .dot { width:10px; height:10px; border-radius:50%; display:inline-block; } .inflation{background:#2457d6}.bank{background:#d64545}.gdp{background:#16845b} .chartbox { position:relative; width:100%; height:min(56vw,560px); min-height:360px; }
+  canvas { width:100%; height:100%; display:block; }
+  .controls { margin-top:16px; padding:17px; background:var(--panel); border-radius:14px; }
+  .sliderRow { display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; }
+  input[type=range] { width:100%; accent-color:var(--accent); cursor:pointer; }
+  .yearMin,.yearMax { font-weight:650; color:var(--muted); font-size:13px; }
+  .buttons { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
+  button {
+    border:1px solid #cbd3e1; background:white; color:var(--ink); border-radius:9px;
+    padding:9px 13px; font-weight:650; cursor:pointer;
+  }
+  button:hover { border-color:var(--accent); }
+  #play { background:var(--accent); border-color:var(--accent); color:white; }
+  .note { margin-top:18px; color:#475467; font-size:13px; line-height:1.5; }
+  .source { margin-top:14px; font-size:12px; color:#667085; }
+  .event {
+    margin-top:12px; padding:11px 13px; border-left:4px solid var(--accent);
+    background:#f1f5ff; border-radius:7px; display:none; font-size:13px;
+  }
+  @media(max-width:800px) {
+    .stats { grid-template-columns:repeat(3,1fr); }
+  }
+  @media(max-width:650px) {
+    .stats { grid-template-columns:1fr 1fr; }
+    .stats .stat:first-child { grid-column:1/-1; }
+    .chartbox { min-height:300px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>UK inflation, Bank Rate and GDP growth, 1926–2025</h1>
+  <div class="subtitle">Move the slider through 100 years of UK economic history. Press <b>Play</b> to animate all three series together.</div>
+
+  <div class="card">
+    <div class="stats">
+      <div class="stat"><div class="label">Selected year</div><div class="big" id="year">1926</div></div>
+      <div class="stat"><div class="label">RPI inflation</div><div class="big" id="rate">−0.8%</div></div>
+      <div class="stat"><div class="label">Bank Rate</div><div class="big" id="bankRate">—</div></div>
+      <div class="stat"><div class="label">Real GDP growth</div><div class="big" id="gdpRate">—</div></div>
+      <div class="stat"><div class="label">Inflation vs previous year</div><div class="big" id="change">—</div></div>
+    </div>
+
+    <div class="legend">
+      <span><i class="dot inflation"></i> RPI inflation</span>
+      <span><i class="dot bank"></i> Bank Rate</span>
+      <span><i class="dot gdp"></i> Real GDP growth</span>
+    </div>
+    <div class="chartbox"><canvas id="chart"></canvas></div>
+
+    <div class="controls">
+      <div class="sliderRow">
+        <span class="yearMin">1926</span>
+        <input id="slider" type="range" min="0" max="99" value="0" step="1" aria-label="Year">
+        <span class="yearMax">2025</span>
+      </div>
+      <div class="buttons">
+        <button id="play">▶ Play</button>
+        <button id="back">← Previous year</button>
+        <button id="forward">Next year →</button>
+        <button id="reset">Reset</button>
+        <button id="jump1975">Jump to 1975</button>
+        <button id="jump2022">Jump to 2022</button>
+      </div>
+      <div id="event" class="event"></div>
+    </div>
+
+    <div class="note">
+      <b>How to read it:</b> all three series are percentages, so they can be compared directly. Inflation measures the annual change in prices; Bank Rate is the average official policy rate during the year; GDP growth measures the annual change in real output.
+      A negative inflation value means the RPI fell compared with the previous year (deflation). A negative GDP value means real output contracted. The graph shows the <b>annual percentage change in the UK Retail Prices Index (RPI)</b>.
+      RPI is used here because it provides a continuous long-run series suitable for a 100-year view. Modern CPI is the
+      government's headline inflation measure, but CPI is only available as an official National Statistic from 1989;
+      earlier CPI estimates are modelled.
+    </div>
+    <div class="source">
+      Sources: Office for National Statistics, <i>Retail Prices Index: Long run series: annual percentage change</i> and GDP series IHYP; Bank of England, annual average official Bank Rate series IUAABEDR,
+      series CDSI, GDP series IHYP released 13 August 2026; Bank Rate series IUAABEDR accessed September 2026.
+    </div>
+  </div>
+</div>
+
+<script>
+const data = [{"year":1926,"inflation":-0.8,"bank":null,"gdp":null},{"year":1927,"inflation":-2.4,"bank":null,"gdp":null},{"year":1928,"inflation":-0.3,"bank":null,"gdp":null},{"year":1929,"inflation":-0.9,"bank":null,"gdp":null},{"year":1930,"inflation":-2.8,"bank":null,"gdp":null},{"year":1931,"inflation":-4.3,"bank":null,"gdp":null},{"year":1932,"inflation":-2.6,"bank":null,"gdp":null},{"year":1933,"inflation":-2.1,"bank":null,"gdp":null},{"year":1934,"inflation":0.0,"bank":null,"gdp":null},{"year":1935,"inflation":0.7,"bank":null,"gdp":null},{"year":1936,"inflation":0.7,"bank":null,"gdp":null},{"year":1937,"inflation":3.4,"bank":null,"gdp":null},{"year":1938,"inflation":1.6,"bank":null,"gdp":null},{"year":1939,"inflation":2.8,"bank":null,"gdp":null},{"year":1940,"inflation":16.8,"bank":null,"gdp":null},{"year":1941,"inflation":10.8,"bank":null,"gdp":null},{"year":1942,"inflation":7.1,"bank":null,"gdp":null},{"year":1943,"inflation":3.4,"bank":null,"gdp":null},{"year":1944,"inflation":2.7,"bank":null,"gdp":null},{"year":1945,"inflation":2.8,"bank":null,"gdp":null},{"year":1946,"inflation":3.1,"bank":null,"gdp":null},{"year":1947,"inflation":7.0,"bank":null,"gdp":null},{"year":1948,"inflation":7.7,"bank":null,"gdp":null},{"year":1949,"inflation":2.8,"bank":null,"gdp":3.3},{"year":1950,"inflation":3.1,"bank":null,"gdp":3.3},{"year":1951,"inflation":9.1,"bank":null,"gdp":3.7},{"year":1952,"inflation":9.2,"bank":null,"gdp":1.5},{"year":1953,"inflation":3.1,"bank":null,"gdp":5.5},{"year":1954,"inflation":1.8,"bank":null,"gdp":4.4},{"year":1955,"inflation":4.5,"bank":null,"gdp":4.0},{"year":1956,"inflation":4.9,"bank":null,"gdp":1.7},{"year":1957,"inflation":3.7,"bank":null,"gdp":2.0},{"year":1958,"inflation":3.0,"bank":null,"gdp":1.3},{"year":1959,"inflation":0.6,"bank":null,"gdp":4.3},{"year":1960,"inflation":1.0,"bank":null,"gdp":6.3},{"year":1961,"inflation":3.4,"bank":null,"gdp":2.7},{"year":1962,"inflation":4.3,"bank":null,"gdp":1.1},{"year":1963,"inflation":2.0,"bank":null,"gdp":4.8},{"year":1964,"inflation":3.3,"bank":null,"gdp":5.7},{"year":1965,"inflation":4.8,"bank":null,"gdp":2.1},{"year":1966,"inflation":3.9,"bank":null,"gdp":1.6},{"year":1967,"inflation":2.5,"bank":null,"gdp":2.8},{"year":1968,"inflation":4.7,"bank":null,"gdp":5.5},{"year":1969,"inflation":5.4,"bank":null,"gdp":1.9},{"year":1970,"inflation":6.4,"bank":null,"gdp":2.7},{"year":1971,"inflation":9.4,"bank":null,"gdp":3.6},{"year":1972,"inflation":7.1,"bank":null,"gdp":4.4},{"year":1973,"inflation":9.2,"bank":null,"gdp":6.5},{"year":1974,"inflation":16.0,"bank":null,"gdp":-2.5},{"year":1975,"inflation":24.2,"bank":null,"gdp":-1.5},{"year":1976,"inflation":16.5,"bank":null,"gdp":3.0},{"year":1977,"inflation":15.8,"bank":null,"gdp":2.5},{"year":1978,"inflation":8.3,"bank":null,"gdp":4.2},{"year":1979,"inflation":13.4,"bank":null,"gdp":3.7},{"year":1980,"inflation":18.0,"bank":13.75,"gdp":-2.0},{"year":1981,"inflation":11.9,"bank":16.3,"gdp":-0.6},{"year":1982,"inflation":8.6,"bank":13.18,"gdp":2.0},{"year":1983,"inflation":4.6,"bank":11.93,"gdp":4.2},{"year":1984,"inflation":5.0,"bank":9.86,"gdp":2.2},{"year":1985,"inflation":6.1,"bank":9.68,"gdp":4.1},{"year":1986,"inflation":3.4,"bank":12.08,"gdp":3.1},{"year":1987,"inflation":4.2,"bank":10.74,"gdp":5.5},{"year":1988,"inflation":4.9,"bank":9.6,"gdp":5.4},{"year":1989,"inflation":7.8,"bank":9.96,"gdp":2.4},{"year":1990,"inflation":9.5,"bank":13.67,"gdp":0.6},{"year":1991,"inflation":5.9,"bank":14.64,"gdp":-1.4},{"year":1992,"inflation":3.7,"bank":11.56,"gdp":0.3},{"year":1993,"inflation":1.6,"bank":9.42,"gdp":2.3},{"year":1994,"inflation":2.4,"bank":5.88,"gdp":3.4},{"year":1995,"inflation":3.5,"bank":5.34,"gdp":2.4},{"year":1996,"inflation":2.4,"bank":6.13,"gdp":2.6},{"year":1997,"inflation":3.1,"bank":7.17,"gdp":4.9},{"year":1998,"inflation":3.4,"bank":7.46,"gdp":3.2},{"year":1999,"inflation":1.5,"bank":5.49,"gdp":2.9},{"year":2000,"inflation":3.0,"bank":5.97,"gdp":4.5},{"year":2001,"inflation":1.8,"bank":4.93,"gdp":2.4},{"year":2002,"inflation":1.7,"bank":4.0,"gdp":1.7},{"year":2003,"inflation":2.9,"bank":3.75,"gdp":3.2},{"year":2004,"inflation":3.0,"bank":4.6,"gdp":2.3},{"year":2005,"inflation":2.8,"bank":4.75,"gdp":2.8},{"year":2006,"inflation":3.2,"bank":4.8,"gdp":2.2},{"year":2007,"inflation":4.3,"bank":5.27,"gdp":2.9},{"year":2008,"inflation":4.0,"bank":4.67,"gdp":0.0},{"year":2009,"inflation":-0.5,"bank":0.57,"gdp":-4.6},{"year":2010,"inflation":4.6,"bank":0.5,"gdp":2.3},{"year":2011,"inflation":5.2,"bank":0.5,"gdp":0.9},{"year":2012,"inflation":3.2,"bank":0.5,"gdp":1.5},{"year":2013,"inflation":3.0,"bank":0.5,"gdp":1.7},{"year":2014,"inflation":2.4,"bank":0.5,"gdp":3.2},{"year":2015,"inflation":1.0,"bank":0.5,"gdp":2.1},{"year":2016,"inflation":1.7,"bank":0.3972,"gdp":2.2},{"year":2017,"inflation":3.6,"bank":0.2897,"gdp":3.0},{"year":2018,"inflation":3.3,"bank":0.6038,"gdp":1.6},{"year":2019,"inflation":2.6,"bank":0.75,"gdp":1.3},{"year":2020,"inflation":1.5,"bank":0.2289,"gdp":-10.0},{"year":2021,"inflation":4.0,"bank":0.1059,"gdp":8.5},{"year":2022,"inflation":11.6,"bank":1.466,"gdp":5.1},{"year":2023,"inflation":9.7,"bank":4.6823,"gdp":0.3},{"year":2024,"inflation":3.6,"bank":5.1093,"gdp":1.0},{"year":2025,"inflation":4.1,"bank":4.252,"gdp":1.3}];
+const events = {"1926": "Start of the 100-year window", "1940": "Wartime inflation", "1951": "Post-war inflation spike", "1975": "Peak of the 1970s inflation era", "1980": "Second major 1970s/80s inflation peak", "1990": "High inflation around the ERM period", "2009": "Brief RPI deflation during the financial crisis", "2022": "Major inflation surge", "2025": "Latest complete annual figure in this dataset"};
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const slider = document.getElementById('slider');
+const yearEl = document.getElementById('year');
+const rateEl = document.getElementById('rate');
+const changeEl = document.getElementById('change');
+const eventEl = document.getElementById('event');
+const playBtn = document.getElementById('play');
+let timer = null;
+
+function resizeCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  const r = canvas.getBoundingClientRect();
+  canvas.width = Math.round(r.width*dpr);
+  canvas.height = Math.round(r.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function fmt(v){ return (v > 0 ? '+' : '') + v.toFixed(1) + '%'; }
+
+function update(){
+  const i = +slider.value, d = data[i];
+  yearEl.textContent = d.year;
+  rateEl.textContent = d.inflation == null ? '—' : fmt(d.inflation);
+  rateEl.classList.toggle('negative', d.inflation < 0);
+  document.getElementById('bankRate').textContent = d.bank == null ? '—' : d.bank.toFixed(2) + '%';
+  document.getElementById('gdpRate').textContent = d.gdp == null ? '—' : fmt(d.gdp);
+  if(i===0 || data[i-1].inflation==null || d.inflation==null) changeEl.textContent = '—';
+  else changeEl.textContent = (d.inflation-data[i-1].inflation >= 0 ? '+' : '') + (d.inflation-data[i-1].inflation).toFixed(1) + ' pp';
+  if(events[d.year]){
+    eventEl.textContent = events[d.year];
+    eventEl.style.display = 'block';
+  } else eventEl.style.display = 'none';
+  draw();
+}
+
+function draw(){
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  ctx.clearRect(0,0,W,H);
+  const m = {l:58,r:22,t:24,b:45};
+  const w=W-m.l-m.r, h=H-m.t-m.b;
+  const minY=-12, maxY=27;
+  const x = i => m.l + (i/(data.length-1))*w;
+  const y = v => m.t + (maxY-v)/(maxY-minY)*h;
+
+  ctx.font='12px Segoe UI, Arial';
+  ctx.textAlign='right';
+  for(let v=-10; v<=25; v+=5){
+    ctx.strokeStyle='#d9dee8'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(m.l,y(v)); ctx.lineTo(W-m.r,y(v)); ctx.stroke();
+    ctx.fillStyle='#667085'; ctx.fillText(v+'%',m.l-9,y(v)+4);
+  }
+  ctx.strokeStyle='#8c96a8'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(m.l,y(0)); ctx.lineTo(W-m.r,y(0)); ctx.stroke();
+
+  ctx.textAlign='center'; ctx.fillStyle='#667085';
+  const step = W < 700 ? 12 : 10;
+  for(let i=0;i<data.length;i+=step) ctx.fillText(data[i].year,x(i),H-18);
+  ctx.fillText(data[data.length-1].year,x(data.length-1),H-18);
+
+  const selected=+slider.value;
+
+  function drawSeries(key, color, width, dash=[]){
+    ctx.beginPath();
+    let started=false;
+    for(let i=0;i<=selected;i++){
+      const v=data[i][key];
+      if(v==null){ started=false; continue; }
+      if(!started){ctx.moveTo(x(i),y(v)); started=true;} else ctx.lineTo(x(i),y(v));
+    }
+    ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.setLineDash(dash); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // Dim future data for each series.
+  function drawFuture(key, color){
+    ctx.beginPath(); let started=false;
+    for(let i=selected;i<data.length;i++){
+      const v=data[i][key]; if(v==null){started=false;continue;}
+      if(!started){ctx.moveTo(x(i),y(v));started=true;} else ctx.lineTo(x(i),y(v));
+    }
+    ctx.strokeStyle=color; ctx.globalAlpha=.18; ctx.lineWidth=2; ctx.setLineDash([4,5]); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha=1;
+  }
+
+  drawFuture('inflation','#2457d6');
+  drawFuture('bank','#d64545');
+  drawFuture('gdp','#16845b');
+
+  drawSeries('inflation','#2457d6',3);
+  drawSeries('bank','#d64545',2.5);
+  drawSeries('gdp','#16845b',2.5);
+
+  // Selected-year vertical guide
+  ctx.strokeStyle='#98a2b3'; ctx.lineWidth=1; ctx.setLineDash([3,4]);
+  ctx.beginPath(); ctx.moveTo(x(selected),m.t); ctx.lineTo(x(selected),H-m.b); ctx.stroke(); ctx.setLineDash([]);
+
+  // Selected markers
+  const series = [
+    ['inflation','#2457d6'],
+    ['bank','#d64545'],
+    ['gdp','#16845b']
+  ];
+  series.forEach(([key,color])=>{
+    const v=data[selected][key];
+    if(v==null) return;
+    const sx=x(selected), sy=y(v);
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(sx,sy,6,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=color; ctx.lineWidth=3; ctx.stroke();
+  });
+
+  ctx.save(); ctx.translate(16,H/2); ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='#475467'; ctx.font='600 12px Segoe UI, Arial'; ctx.textAlign='center';
+  ctx.fillText('Annual percentage change / Bank Rate',0,0); ctx.restore();
+}
+
+slider.addEventListener('input',update);
+document.getElementById('back').onclick=()=>{slider.value=Math.max(0,+slider.value-1);update()};
+document.getElementById('forward').onclick=()=>{slider.value=Math.min(99,+slider.value+1);update()};
+document.getElementById('reset').onclick=()=>{slider.value=0;stop();update()};
+document.getElementById('jump1975').onclick=()=>{slider.value=1975-1926;stop();update()};
+document.getElementById('jump2022').onclick=()=>{slider.value=2022-1926;stop();update()};
+
+function stop(){ if(timer){clearInterval(timer);timer=null;} playBtn.textContent='▶ Play'; }
+playBtn.onclick=()=>{
+  if(timer){stop();return;}
+  playBtn.textContent='❚❚ Pause';
+  timer=setInterval(()=>{
+    let i=+slider.value;
+    if(i>=99){stop();return;}
+    slider.value=i+1; update();
+  },120);
+};
+
+update();
+resizeCanvas();
+</script>
+</body>
+</html>
